@@ -1,77 +1,130 @@
-import pandas as pd
-import re
 import os
+import re
+import csv
+import pandas as pd
+from typing import List
 
-# 1. Load the raw scraped data from the CSV file
-# Change the path if your file is in a different location
-raw_csv_path = r'C:\Users\hp\Desktop\matos\tenx 10academy\week 4\Amharic E-commerce Data Extractor\data\raw\telegram_data.csv'
-df = pd.read_csv(raw_csv_path)
+# Function to load raw data from a CSV file
+def load_raw_data(file_path: str) -> pd.DataFrame:
+    """
+    Load raw data from the CSV file into a pandas DataFrame.
 
-# 2. Define a function to clean the message text
-def clean_text(text):
+    Args:
+    - file_path: The path to the CSV file containing raw scraped data.
+
+    Returns:
+    - A pandas DataFrame with raw data.
     """
-    Cleans the input text by:
-    - Removing URLs
-    - Removing non-Amharic letters and numbers (keeps Amharic, English, numbers, and basic punctuation)
-    - Removing extra spaces
+    return pd.read_csv(file_path, encoding="utf-8")
+
+# Function to clean the text data
+def clean_text(text: str) -> str:
     """
-    if pd.isnull(text):
+    Clean raw text by removing unnecessary symbols, emojis, and excessive whitespace.
+
+    Args:
+    - text: The raw text message.
+
+    Returns:
+    - A cleaned version of the text.
+    """
+    if pd.isna(text):  # Handle NaN values
         return ""
-    # Remove URLs
-    text = re.sub(r"http\S+", "", text)
-    # Remove unwanted characters (keep Amharic, English, numbers, and basic punctuation)
-    text = re.sub(r"[^\u1200-\u137F\w\s፡።፣፤፥፦፧፨.,!?]", "", text)
-    # Remove extra spaces
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
+    
+    # Remove emojis and special characters
+    text = re.sub(r'[^\w\s፡።፣፤፥፦፧፨ብበበችናየእነእና]', '', text)  # Keep Amharic punctuation
+    # Normalize whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
-# 3. Apply the cleaning function to the 'Message' column
-df['Cleaned_Message'] = df['Message'].apply(clean_text)
-
-# 4. Tokenize the cleaned message
-def tokenize_text(text):
+# Function to tokenize the text into words
+def tokenize_text(text: str) -> List[str]:
     """
-    Splits the cleaned text into a list of words (tokens).
-    This is a simple whitespace split. For Amharic, more advanced tokenizers can be used if available.
+    Tokenize text into individual words.
+
+    Args:
+    - text: Cleaned text message.
+
+    Returns:
+    - A list of tokens (words).
     """
     return text.split()
 
-df['Tokens'] = df['Cleaned_Message'].apply(tokenize_text)
-
-# 5. (Optional) Remove Amharic stopwords
-# You can expand this list with more Amharic stopwords as needed
-amharic_stopwords = set([
-    "እና", "እዚህ", "ይህ", "ያ", "ነው", "አይደለም", "እንደ", "ለ", "በ", "ከ", "ወደ", "እስከ", "እ", "የ", "ማን", "ምን", "ለምን", "የት", "እንግዲኛ"
-])
-
-def remove_stopwords(tokens):
+# Function to normalize the text (handling Amharic-specific linguistic features)
+def normalize_text(text: str) -> str:
     """
-    Removes common Amharic stopwords from the list of tokens.
+    Normalize text for Amharic-specific linguistic features (e.g., handling variations in characters).
+
+    Args:
+    - text: Cleaned and tokenized text.
+
+    Returns:
+    - Normalized text.
     """
-    return [token for token in tokens if token not in amharic_stopwords]
+    # Example: Handle variations of similar-looking Amharic characters
+    text = text.replace("ሃ", "ሀ").replace("ኅ", "ሀ").replace("ሐ", "ሀ").replace("ኻ", "ሀ")
+    return text
 
-df['Tokens_No_Stopwords'] = df['Tokens'].apply(remove_stopwords)
+# Function to preprocess a single row of data
+def preprocess_row(row: dict) -> dict:
+    """
+    Preprocess only the 'Message' column and retain other columns as they are.
 
-# 6. Organize columns for clarity
-# You can add or remove columns as needed for your downstream tasks
-columns_to_keep = [
-    'Channel Title', 'Channel Username', 'ID', 'Date', 'Media Path', 'View Count',
-    'Cleaned_Message', 'Tokens', 'Tokens_No_Stopwords'
-]
-df_final = df[columns_to_keep]
+    Args:
+    - row: A dictionary representing a row of raw data.
 
-# 7. Save the preprocessed data to a new CSV file
-preprocessed_csv_path = r'C:\Users\hp\Desktop\matos\tenx 10academy\week 4\Amharic E-commerce Data Extractor\data\raw\preprocessed_telegram_data.csv'
-df_final.to_csv(preprocessed_csv_path, index=False, encoding='utf-8')
+    Returns:
+    - A dictionary with the processed 'Message' column and unprocessed other columns.
+    """
+    cleaned_message = clean_text(row.get("Message", ""))
+    tokenized_message = tokenize_text(cleaned_message)
+    normalized_message = normalize_text(" ".join(tokenized_message))
+    
+    # Return the processed message along with unaltered other columns
+    return {
+        "Channel Title": row.get("Channel Title", ""),
+        "Channel Username": row.get("Channel Username", ""),
+        "Message": normalized_message,  # Preprocessed message
+        "Date": row.get("Date", ""),    # Unchanged
+        "Media Path": row.get("Media Path", ""),  # Unchanged
+        "View Count": row.get("View Count", ""),  # Unchanged
+    }
 
-# 8. Print a message to confirm completion
-print(f"Preprocessing complete! Preprocessed data saved to: {preprocessed_csv_path}")
 
-# ---------------------------
-# What this script does:
-# - Loads your raw Telegram data
-# - Cleans and normalizes the message text
-# - Tokenizes the text into words
-# - Removes common Amharic stopwords
-# - Keeps important metadata (channel, date, media, etc.)
-# - Saves the cleaned and structured data for further analysis
+# Function to preprocess the entire dataset
+def preprocess_data(input_file: str, output_file: str):
+    """
+    Preprocess the raw data and save the cleaned data to a new CSV file.
+
+    Args:
+    - input_file: Path to the raw data CSV file.
+    - output_file: Path to save the cleaned data CSV file.
+    """
+    raw_data = load_raw_data(input_file)
+    preprocessed_data = []
+
+    # Process each row in the dataset
+    for _, row in raw_data.iterrows():
+        preprocessed_row = preprocess_row(row)
+        preprocessed_data.append(preprocessed_row)
+
+    # Save preprocessed data to a new CSV file
+    preprocessed_df = pd.DataFrame(preprocessed_data)
+    preprocessed_df.to_csv(output_file, index=False, encoding="utf-8")
+
+    print(f"Preprocessed data saved to {output_file}")
+
+# Function to integrate all preprocessing steps
+def main_preprocessing():
+    """
+    Integrate all preprocessing steps: loading, cleaning, tokenizing, normalizing, and saving data.
+    """
+    input_csv = r'C:\Users\hp\Desktop\matos\tenx 10academy\week 4\Amharic E-commerce Data Extractor\data\raw\telegram_data.csv'
+    output_csv = r'C:\Users\hp\Desktop\matos\tenx 10academy\week 4\Amharic E-commerce Data Extractor\data\processed\telegram_data_cleaned.csv'
+
+    os.makedirs(os.path.dirname(output_csv), exist_ok=True)  # Ensure the output directory exists
+    preprocess_data(input_csv, output_csv)
+
+# Run the preprocessing pipeline
+if __name__ == "__main__":
+    main_preprocessing()

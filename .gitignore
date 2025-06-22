@@ -1,3 +1,5 @@
+session_name.session
+scraping_session.session
 # Python
 __pycache__/
 *.py[cod]

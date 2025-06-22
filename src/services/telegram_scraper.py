@@ -68,7 +68,6 @@ async def main():
             await scrape_channel(client, channel, writer, media_dir)
             print(f"Scraped data from {channel}")
 
-    return
 
 # asyncio.run(main())
 with client:

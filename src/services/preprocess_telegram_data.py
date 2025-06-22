@@ -84,10 +84,11 @@ def preprocess_row(row: dict) -> dict:
     return {
         "Channel Title": row.get("Channel Title", ""),
         "Channel Username": row.get("Channel Username", ""),
+        "ID": row.get("ID", ""),
         "Message": normalized_message,  # Preprocessed message
-        "Date": row.get("Date", ""),    # Unchanged
-        "Media Path": row.get("Media Path", ""),  # Unchanged
-        "View Count": row.get("View Count", ""),  # Unchanged
+        "Date": row.get("Date", ""), 
+        "Media Path": row.get("Media Path", ""),
+        "View Count": row.get("View Count", ""), 
     }
 
 
@@ -103,7 +104,7 @@ def preprocess_data(input_file: str, output_file: str):
     raw_data = load_raw_data(input_file)
     preprocessed_data = []
 
-    # Process each row in the dataset
+    # Process each messages in the dataset
     for _, row in raw_data.iterrows():
         preprocessed_row = preprocess_row(row)
         preprocessed_data.append(preprocessed_row)
